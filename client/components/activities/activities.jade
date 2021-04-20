@@ -15,11 +15,18 @@ template(name="cardActivities")
   each activityData in currentCard.activities
     +activity(activity=activityData card=card mode=mode)
 
+template(name="editOrDeleteComment")
+  = ' - '
+  a.js-open-inlined-form {{_ "edit"}}
+  = ' - '
+  a.js-delete-comment {{_ "delete"}}
+
 template(name="activity")
   .activity
     +userAvatar(userId=activity.user._id)
     p.activity-desc
-      +memberName(user=activity.user)
+      span.activity-member
+        +memberName(user=activity.user)
 
       //- attachment activity -------------------------------------------------
       if($eq activity.activityType 'deleteAttachment')
@@ -75,7 +82,7 @@ template(name="activity")
             +viewer
               = activity.checklist.title
         else
-          a.activity-checklist(href="{{ activity.card.absoluteUrl }}")
+          a.activity-checklist(href="{{ activity.card.originRelativeUrl }}")
             +viewer
               = activity.checklist.title
 
@@ -96,7 +103,7 @@ template(name="activity")
 
       if($eq activity.activityType 'addChecklistItem')
         | {{{_ 'activity-checklist-item-added' (sanitize activity.checklist.title) cardLink}}}.
-        .activity-checklist(href="{{ activity.card.absoluteUrl }}")
+        .activity-checklist(href="{{ activity.card.originRelativeUrl }}")
           +viewer
             = activity.checklistItem.title
 
@@ -118,11 +125,10 @@ template(name="activity")
               +viewer
                 = activity.comment.text
             span(title=activity.createdAt).activity-meta {{ moment activity.createdAt }}
-              if ($eq currentUser._id activity.comment.userId)
-                = ' - '
-                a.js-open-inlined-form {{_ "edit"}}
-                = ' - '
-                a.js-delete-comment {{_ "delete"}}
+              if($eq currentUser._id activity.comment.userId)
+                +editOrDeleteComment
+              else if currentUser.isBoardAdmin
+                +editOrDeleteComment
 
         if($eq activity.activityType 'deleteComment')
           | {{{_ 'activity-deleteComment' currentData.commentId}}}.
@@ -133,9 +139,36 @@ template(name="activity")
         //- if we are not in card mode we only display a summary of the comment
         if($eq activity.activityType 'addComment')
           | {{{_ 'activity-on' cardLink}}}
-          a.activity-comment(href="{{ activity.card.absoluteUrl }}")
+          a.activity-comment(href="{{ activity.card.originRelativeUrl }}")
             +viewer
               = activity.comment.text
+
+      //- date activity ------------------------------------------------
+      if($eq mode 'card')
+        if($eq activity.activityType 'a-receivedAt')
+          | {{{_ 'activity-receivedDate' (sanitize receivedDate) cardLink}}}.
+
+        if($eq activity.activityType 'a-startAt')
+          | {{{_ 'activity-startDate' (sanitize startDate) cardLink}}}.
+        
+        if($eq activity.activityType 'a-dueAt')
+          | {{{_ 'activity-dueDate' (sanitize dueDate) cardLink}}}.
+
+        if($eq activity.activityType 'a-endAt')
+          | {{{_ 'activity-endDate' (sanitize endDate) cardLink}}}.
+      
+      if($eq mode 'board')
+        if($eq activity.activityType 'a-receivedAt')
+          | {{{_ 'activity-receivedDate' (sanitize receivedDate) cardLink}}}.
+
+        if($eq activity.activityType 'a-startAt')
+          | {{{_ 'activity-startDate' (sanitize startDate) cardLink}}}.
+        
+        if($eq activity.activityType 'a-dueAt')
+          | {{{_ 'activity-dueDate' (sanitize dueDate) cardLink}}}.
+
+        if($eq activity.activityType 'a-endAt')
+          | {{{_ 'activity-endDate' (sanitize endDate) cardLink}}}.
 
       //- customField activity ------------------------------------------------
       if($eq mode 'board')

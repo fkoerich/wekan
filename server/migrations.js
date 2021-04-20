@@ -122,6 +122,7 @@ Migrations.add('use-css-class-for-boards-colors', () => {
     '#499BEA': 'clearblue',
     '#596557': 'natural',
     '#2A80B8': 'modern',
+    '#2a2a2a': 'moderndark',
   };
   Boards.find().forEach(board => {
     const oldBoardColor = board.background.color;
@@ -1043,4 +1044,20 @@ Migrations.add('add-default-profile-view', () => {
       );
     }
   });
+});
+
+Migrations.add('add-hide-logo-by-default', () => {
+  Settings.update(
+    {
+      hideLogo: {
+        hideLogo: false,
+      },
+    },
+    {
+      $set: {
+        hideLogo: true,
+      },
+    },
+    noValidateMulti,
+  );
 });

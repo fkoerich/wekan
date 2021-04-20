@@ -1,46 +1,93 @@
-import { Cookies } from 'meteor/ostrio:cookies';
-const cookies = new Cookies();
-
 Utils = {
   setBoardView(view) {
     currentUser = Meteor.user();
     if (currentUser) {
       Meteor.user().setBoardView(view);
     } else if (view === 'board-view-swimlanes') {
-      cookies.set('boardView', 'board-view-swimlanes'); //true
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
       location.reload();
     } else if (view === 'board-view-lists') {
-      cookies.set('boardView', 'board-view-lists'); //true
+      window.localStorage.setItem('boardView', 'board-view-lists'); //true
       location.reload();
     } else if (view === 'board-view-cal') {
-      cookies.set('boardView', 'board-view-cal'); //true
+      window.localStorage.setItem('boardView', 'board-view-cal'); //true
       location.reload();
     } else {
-      cookies.set('boardView', 'board-view-swimlanes'); //true
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
       location.reload();
     }
   },
 
   unsetBoardView() {
-    cookies.remove('boardView');
-    cookies.remove('collapseSwimlane');
+    window.localStorage.removeItem('boardView');
+    window.localStorage.removeItem('collapseSwimlane');
   },
 
   boardView() {
     currentUser = Meteor.user();
     if (currentUser) {
       return (currentUser.profile || {}).boardView;
-    } else if (cookies.get('boardView') === 'board-view-swimlanes') {
+    } else if (
+      window.localStorage.getItem('boardView') === 'board-view-swimlanes'
+    ) {
       return 'board-view-swimlanes';
-    } else if (cookies.get('boardView') === 'board-view-lists') {
+    } else if (
+      window.localStorage.getItem('boardView') === 'board-view-lists'
+    ) {
       return 'board-view-lists';
-    } else if (cookies.get('boardView') === 'board-view-cal') {
+    } else if (window.localStorage.getItem('boardView') === 'board-view-cal') {
       return 'board-view-cal';
     } else {
-      cookies.set('boardView', 'board-view-swimlanes'); //true
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
       location.reload();
       return 'board-view-swimlanes';
     }
+  },
+
+  myCardsSort() {
+    let sort = window.localStorage.getItem('myCardsSort');
+
+    if (!sort || !['board', 'dueAt'].includes(sort)) {
+      sort = 'board';
+    }
+
+    return sort;
+  },
+
+  myCardsSortToggle() {
+    if (this.myCardsSort() === 'board') {
+      this.setMyCardsSort('dueAt');
+    } else {
+      this.setMyCardsSort('board');
+    }
+  },
+
+  setMyCardsSort(sort) {
+    window.localStorage.setItem('myCardsSort', sort);
+    location.reload();
+  },
+
+  archivedBoardIds() {
+    const archivedBoards = [];
+    Boards.find({ archived: false }).forEach(board => {
+      archivedBoards.push(board._id);
+    });
+    return archivedBoards;
+  },
+
+  dueCardsView() {
+    let view = window.localStorage.getItem('dueCardsView');
+
+    if (!view || !['me', 'all'].includes(view)) {
+      view = 'me';
+    }
+
+    return view;
+  },
+
+  setDueCardsView(view) {
+    window.localStorage.setItem('dueCardsView', view);
+    location.reload();
   },
 
   // XXX We should remove these two methods
@@ -187,6 +234,21 @@ Utils = {
     //if (hasTouchScreen)
     //    document.getElementById("exampleButton").style.padding="1em";
     //return false;
+  },
+
+  // returns if desktop drag handles are enabled
+  isShowDesktopDragHandles() {
+    const currentUser = Meteor.user();
+    if (currentUser) {
+      return (currentUser.profile || {}).showDesktopDragHandles;
+    } else {
+      return false;
+    }
+  },
+
+  // returns if mini screen or desktop drag handles
+  isMiniScreenOrShowDesktopDragHandles() {
+    return this.isMiniScreen() || this.isShowDesktopDragHandles();
   },
 
   calculateIndexData(prevData, nextData, nItems = 1) {

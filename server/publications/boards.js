@@ -27,6 +27,7 @@ Meteor.publish('boards', function() {
     {
       fields: {
         _id: 1,
+        boardId: 1,
         archived: 1,
         slug: 1,
         title: 1,
@@ -62,8 +63,11 @@ Meteor.publish('archivedBoards', function() {
         archived: 1,
         slug: 1,
         title: 1,
+        createdAt: 1,
+        modifiedAt: 1,
+        archivedAt: 1,
       },
-      sort: { sort: 1 /* boards default sorting */ },
+      sort: { archivedAt: -1, modifiedAt: -1 },
     },
   );
 });
@@ -207,4 +211,20 @@ Meteor.publishRelations('board', function(boardId, isArchived) {
   );
 
   return this.ready();
+});
+
+Meteor.methods({
+  copyBoard(boardId, properties) {
+    check(boardId, String);
+    check(properties, Object);
+
+    const board = Boards.findOne(boardId);
+    if (board) {
+      for (const key in properties) {
+        board[key] = properties[key];
+      }
+      return board.copy();
+    }
+    return null;
+  },
 });

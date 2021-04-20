@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: Wekan REST API
-  version: v4.22
+  version: v5.22
   description: |
     The REST API allows you to control and extend Wekan with ease.
 
@@ -278,6 +278,74 @@ paths:
           in: path
           description: |
             the ID of the board
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+  /api/boards/{board}/attachments:
+    get:
+      operationId: get_board_attachments
+      summary: Get the list of attachments of a board
+      tags:
+        - Boards
+      parameters:
+        - name: board
+          in: path
+          description: |
+            the board ID
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                attachmentId:
+                  type: string
+                attachmentName:
+                  type: string
+                attachmentType:
+                  type: string
+                cardId:
+                  type: string
+                listId:
+                  type: string
+                swimlaneId:
+                  type: string
+  /api/boards/{board}/attachments/{attachment}/export:
+    get:
+      operationId: exportJson
+      summary: This route is used to export a attachement to a json file format.
+      description: |
+        If user is already logged-in, pass loginToken as param
+         "authToken": '/api/boards/:boardId/attachments/:attachmentId/export?authToken=:token'
+      tags:
+        - Boards
+      parameters:
+        - name: board
+          in: path
+          description: |
+            the ID of the board we are exporting
+          type: string
+          required: true
+        - name: attachment
+          in: path
+          description: |
+            the ID of the attachment we are exporting
           type: string
           required: true
       produces:
@@ -942,7 +1010,87 @@ paths:
           description: |-
             200 response
           schema:
-            $ref: "#/definitions/CustomFields"
+            type: array
+            items:
+              type: object
+              properties:
+                _id:
+                  type: string
+                boardIds:
+                  type: string
+    put:
+      operationId: edit_custom_field
+      summary: Update a Custom Field
+      tags:
+        - CustomFields
+      consumes:
+        - multipart/form-data
+        - application/json
+      parameters:
+        - name: name
+          in: formData
+          description: |
+            the name of the custom field
+          type: string
+          required: true
+        - name: type
+          in: formData
+          description: |
+            the type of the custom field
+          type: string
+          required: true
+        - name: settings
+          in: formData
+          description: |
+            the settings object of the custom field
+          type: string
+          required: true
+        - name: showOnCard
+          in: formData
+          description: |
+            should we show the custom field on cards
+          type: boolean
+          required: true
+        - name: automaticallyOnCard
+          in: formData
+          description: |
+            should the custom fields automatically be added on cards
+          type: boolean
+          required: true
+        - name: alwaysOnCard
+          in: formData
+          description: the alwaysOnCard value
+          type: string
+          required: true
+        - name: showLabelOnMiniCard
+          in: formData
+          description: |
+            should the label of the custom field be shown on minicards
+          type: boolean
+          required: true
+        - name: board
+          in: path
+          description: the board value
+          type: string
+          required: true
+        - name: customField
+          in: path
+          description: the customField value
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
     delete:
       operationId: delete_custom_field
       summary: Delete a Custom Fields attached to a board
@@ -960,6 +1108,123 @@ paths:
           in: path
           description: |
             the ID of the custom field
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
+  /api/boards/{board}/custom-fields/{customField}/dropdown-items:
+    post:
+      operationId: add_custom_field_dropdown_items
+      summary: Update a Custom Field's dropdown items
+      tags:
+        - CustomFields
+      consumes:
+        - multipart/form-data
+        - application/json
+      parameters:
+        - name: items
+          in: formData
+          description: |
+            names of the custom field
+          type: string
+          required: false
+        - name: board
+          in: path
+          description: the board value
+          type: string
+          required: true
+        - name: customField
+          in: path
+          description: the customField value
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
+  /api/boards/{board}/custom-fields/{customField}/dropdown-items/{dropdownItem}:
+    put:
+      operationId: edit_custom_field_dropdown_item
+      summary: Update a Custom Field's dropdown item
+      tags:
+        - CustomFields
+      consumes:
+        - multipart/form-data
+        - application/json
+      parameters:
+        - name: name
+          in: formData
+          description: |
+            names of the custom field
+          type: string
+          required: true
+        - name: board
+          in: path
+          description: the board value
+          type: string
+          required: true
+        - name: customField
+          in: path
+          description: the customField value
+          type: string
+          required: true
+        - name: dropdownItem
+          in: path
+          description: the dropdownItem value
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
+    delete:
+      operationId: delete_custom_field_dropdown_item
+      summary: Update a Custom Field's dropdown items
+      tags:
+        - CustomFields
+      parameters:
+        - name: board
+          in: path
+          description: the board value
+          type: string
+          required: true
+        - name: customField
+          in: path
+          description: the customField value
+          type: string
+          required: true
+        - name: dropdownItem
+          in: path
+          description: the dropdownItem value
           type: string
           required: true
       produces:
@@ -1580,6 +1845,12 @@ paths:
             the new title of the card
           type: string
           required: false
+        - name: sort
+          in: formData
+          description: |
+            the new sort value of the card
+          type: string
+          required: false
         - name: parentId
           in: formData
           description: |
@@ -2098,6 +2369,58 @@ paths:
                   type: string
                 listId:
                   type: string
+  /api/boards_count:
+    get:
+      operationId: get_boards_count
+      summary: Get public and private boards count
+      tags:
+        - Boards
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              private:
+                type: integer
+              public:
+                type: integer
+  /api/createtoken/{user}:
+    post:
+      operationId: create_user_token
+      summary: Create a user token
+      description: |
+        Only the admin user (the first user) can call the REST API.
+      tags:
+        - Users
+      consumes:
+        - multipart/form-data
+        - application/json
+      parameters:
+        - name: user
+          in: path
+          description: |
+            the ID of the user to create token for.
+          type: string
+          required: true
+      produces:
+        - application/json
+      security:
+          - UserSecurity: []
+      responses:
+        '200':
+          description: |-
+            200 response
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
   /api/user:
     get:
       operationId: get_current_user
@@ -2193,7 +2516,7 @@ paths:
         - name: user
           in: path
           description: |
-            the user ID
+            the user ID or username
           type: string
           required: true
       produces:
@@ -2323,6 +2646,11 @@ definitions:
         description: |
            Is the board archived?
         type: boolean
+      archivedAt:
+        description: |
+           Latest archiving time of the board
+        type: string
+        x-nullable: true
       createdAt:
         description: |
            Creation time of the board
@@ -2375,6 +2703,7 @@ definitions:
           - clearblue
           - natural
           - modern
+          - moderndark
       description:
         description: |
            The description of the board
@@ -2427,6 +2756,10 @@ definitions:
       allowsLabels:
         description: |
            Does the board allows labels?
+        type: boolean
+      allowsCreator:
+        description: |
+           Does the board allow creator?
         type: boolean
       allowsAssignee:
         description: |
@@ -2505,7 +2838,12 @@ definitions:
       type:
         description: |
            The type of board
+           possible values: board, template-board, template-container
         type: string
+        enum:
+          - board
+          - template-board
+          - template-container
       sort:
         description: |
            Sort value
@@ -2528,6 +2866,7 @@ definitions:
       - allowsDescriptionText
       - allowsActivities
       - allowsLabels
+      - allowsCreator
       - allowsAssignee
       - allowsMembers
       - allowsRequestedBy
@@ -2560,6 +2899,7 @@ definitions:
            `saddlebrown`, `paleturquoise`, `mistyrose`, `indigo`
         type: string
         enum:
+          - white
           - green
           - yellow
           - orange
@@ -2663,6 +3003,11 @@ definitions:
         description: |
            is the card archived
         type: boolean
+      archivedAt:
+        description: |
+           latest archiving date
+        type: string
+        x-nullable: true
       parentId:
         description: |
            ID of the parent card
@@ -2962,7 +3307,9 @@ definitions:
           - number
           - date
           - dropdown
+          - checkbox
           - currency
+          - stringtemplate
       settings:
         description: |
            settings of the custom field
@@ -2974,6 +3321,10 @@ definitions:
       automaticallyOnCard:
         description: |
            should the custom fields automatically be added on cards?
+        type: boolean
+      alwaysOnCard:
+        description: |
+           should the custom field be automatically added to all cards?
         type: boolean
       showLabelOnMiniCard:
         description: |
@@ -2991,6 +3342,7 @@ definitions:
       - settings
       - showOnCard
       - automaticallyOnCard
+      - alwaysOnCard
       - showLabelOnMiniCard
       - modifiedAt
   CustomFieldsSettings:
@@ -3004,6 +3356,10 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/CustomFieldsSettingsDropdownitems"
+      stringtemplateFormat:
+        type: string
+      stringtemplateSeparator:
+        type: string
   CustomFieldsSettingsDropdownitems:
     type: object
   Integrations:
@@ -3077,6 +3433,11 @@ definitions:
         description: |
            is the list archived
         type: boolean
+      archivedAt:
+        description: |
+           latest archiving date
+        type: string
+        x-nullable: true
       boardId:
         description: |
            the board associated to this list
@@ -3122,6 +3483,7 @@ definitions:
           - lime
           - pink
           - black
+          - silver
           - peachpuff
           - crimson
           - plum
@@ -3179,6 +3541,11 @@ definitions:
         description: |
            is the swimlane archived?
         type: boolean
+      archivedAt:
+        description: |
+           latest archiving date of the swimlane
+        type: string
+        x-nullable: true
       boardId:
         description: |
            the ID of the board the swimlane is attached to
@@ -3208,6 +3575,7 @@ definitions:
           - lime
           - pink
           - black
+          - silver
           - peachpuff
           - crimson
           - plum
@@ -3296,6 +3664,19 @@ definitions:
         description: |
            authentication method of the user
         type: string
+      sessionData:
+        description: |
+           profile settings
+        $ref: "#/definitions/UsersSessiondata"
+        x-nullable: true
+      importUsernames:
+        description: |
+           username for imported
+        type: array
+        items:
+          type: string
+          x-nullable: true
+        x-nullable: true
     required:
       - createdAt
       - modifiedAt
@@ -3437,3 +3818,14 @@ definitions:
       - cardTemplatesSwimlaneId
       - listTemplatesSwimlaneId
       - boardTemplatesSwimlaneId
+  UsersSessiondata:
+    type: object
+    properties:
+      totalHits:
+        description: |
+           Total hits from last search
+        type: number
+      lastHit:
+        description: |
+           last hit that was returned
+        type: number

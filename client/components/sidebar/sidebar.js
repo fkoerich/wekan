@@ -1,5 +1,3 @@
-import { Cookies } from 'meteor/ostrio:cookies';
-const cookies = new Cookies();
 Sidebar = null;
 
 const defaultView = 'home';
@@ -16,7 +14,7 @@ const viewTitles = {
 
 BlazeComponent.extendComponent({
   mixins() {
-    return [Mixins.InfiniteScrolling, Mixins.PerfectScrollbar];
+    return [Mixins.InfiniteScrolling];
   },
 
   onCreated() {
@@ -112,10 +110,12 @@ BlazeComponent.extendComponent({
           currentUser = Meteor.user();
           if (currentUser) {
             Meteor.call('toggleMinicardLabelText');
-          } else if (cookies.has('hiddenMinicardLabelText')) {
-            cookies.remove('hiddenMinicardLabelText');
+          } else if (window.localStorage.getItem('hiddenMinicardLabelText')) {
+            window.localStorage.removeItem('hiddenMinicardLabelText');
+            location.reload();
           } else {
-            cookies.set('hiddenMinicardLabelText', 'true');
+            window.localStorage.setItem('hiddenMinicardLabelText', 'true');
+            location.reload();
           }
         },
         'click .js-shortcuts'() {
@@ -133,7 +133,7 @@ Template.homeSidebar.helpers({
     currentUser = Meteor.user();
     if (currentUser) {
       return (currentUser.profile || {}).hiddenMinicardLabelText;
-    } else if (cookies.has('hiddenMinicardLabelText')) {
+    } else if (window.localStorage.getItem('hiddenMinicardLabelText')) {
       return true;
     } else {
       return false;
@@ -155,6 +155,9 @@ Template.memberPopup.helpers({
   user() {
     return Users.findOne(this.userId);
   },
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
   memberType() {
     const type = Users.findOne(this.userId).isBoardAdmin() ? 'admin' : 'normal';
     if (type === 'normal') {
@@ -163,16 +166,16 @@ Template.memberPopup.helpers({
       const noComments = currentBoard.hasNoComments(this.userId);
       const worker = currentBoard.hasWorker(this.userId);
       if (commentOnly) {
-        return TAPi18n.__('comment-only').toLowerCase();
+        return TAPi18n.__('comment-only');
       } else if (noComments) {
-        return TAPi18n.__('no-comments').toLowerCase();
+        return TAPi18n.__('no-comments');
       } else if (worker) {
-        return TAPi18n.__('worker').toLowerCase();
+        return TAPi18n.__('worker');
       } else {
-        return TAPi18n.__(type).toLowerCase();
+        return TAPi18n.__(type);
       }
     } else {
-      return TAPi18n.__(type).toLowerCase();
+      return TAPi18n.__(type);
     }
   },
   isInvited() {
@@ -224,6 +227,9 @@ Template.boardMenuPopup.onCreated(function() {
 });
 
 Template.boardMenuPopup.helpers({
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
   withApi() {
     return Template.instance().apiEnabled.get();
   },
@@ -238,7 +244,7 @@ Template.boardMenuPopup.helpers({
   },
   exportFilename() {
     const boardId = Session.get('currentBoard');
-    return `wekan-export-board-${boardId}.json`;
+    return `export-board-${boardId}.json`;
   },
 });
 
@@ -249,10 +255,14 @@ Template.memberPopup.events({
   },
   'click .js-change-role': Popup.open('changePermissions'),
   'click .js-remove-member': Popup.afterConfirm('removeMember', function() {
+    // This works from removing member from board, card members and assignees.
     const boardId = Session.get('currentBoard');
     const memberId = this.userId;
     Cards.find({ boardId, members: memberId }).forEach(card => {
       card.unassignMember(memberId);
+    });
+    Cards.find({ boardId, assignees: memberId }).forEach(card => {
+      card.unassignAssignee(memberId);
     });
     Boards.findOne(boardId).removeMember(memberId);
     Popup.close();
@@ -293,6 +303,9 @@ Template.membersWidget.helpers({
     } else {
       return false;
     }
+  },
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
   },
 });
 
@@ -422,6 +435,23 @@ BlazeComponent.extendComponent({
     };
     return FlowRouter.path('/api/boards/:boardId/export', params, queryParams);
   },
+  exportUrlExcel() {
+    const params = {
+      boardId: Session.get('currentBoard'),
+    };
+    const queryParams = {
+      authToken: Accounts._storedLoginToken(),
+    };
+    return FlowRouter.path(
+      '/api/boards/:boardId/exportExcel',
+      params,
+      queryParams,
+    );
+  },
+  exportFilenameExcel() {
+    const boardId = Session.get('currentBoard');
+    return `export-board-excel-${boardId}.xlsx`;
+  },
   exportCsvUrl() {
     const params = {
       boardId: Session.get('currentBoard'),
@@ -451,15 +481,15 @@ BlazeComponent.extendComponent({
   },
   exportJsonFilename() {
     const boardId = Session.get('currentBoard');
-    return `wekan-export-board-${boardId}.json`;
+    return `export-board-${boardId}.json`;
   },
   exportCsvFilename() {
     const boardId = Session.get('currentBoard');
-    return `wekan-export-board-${boardId}.csv`;
+    return `export-board-${boardId}.csv`;
   },
   exportTsvFilename() {
     const boardId = Session.get('currentBoard');
-    return `wekan-export-board-${boardId}.tsv`;
+    return `export-board-${boardId}.tsv`;
   },
 }).register('exportBoardPopup');
 
@@ -473,6 +503,12 @@ Template.exportBoard.events({
 Template.labelsWidget.events({
   'click .js-label': Popup.open('editLabel'),
   'click .js-add-label': Popup.open('createLabel'),
+});
+
+Template.labelsWidget.helpers({
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
 });
 
 // Board members can assign people or labels by drag-dropping elements from the
@@ -694,6 +730,14 @@ BlazeComponent.extendComponent({
     return this.currentBoard.allowsSubtasks;
   },
 
+  allowsCreator() {
+    return (
+      this.currentBoard.allowsCreator === null ||
+      this.currentBoard.allowsCreator === undefined ||
+      this.currentBoard.allowsCreator
+    );
+  },
+
   allowsMembers() {
     return this.currentBoard.allowsMembers;
   },
@@ -851,6 +895,19 @@ BlazeComponent.extendComponent({
           $('.js-field-has-subtasks').toggleClass(
             CKCLS,
             this.currentBoard.allowsSubtasks,
+          );
+        },
+        'click .js-field-has-creator'(evt) {
+          evt.preventDefault();
+          this.currentBoard.allowsCreator = !this.currentBoard.allowsCreator;
+          this.currentBoard.setAllowsCreator(this.currentBoard.allowsCreator);
+          $(`.js-field-has-creator ${MCB}`).toggleClass(
+            CKCLS,
+            this.currentBoard.allowsCreator,
+          );
+          $('.js-field-has-creator').toggleClass(
+            CKCLS,
+            this.currentBoard.allowsCreator,
           );
         },
         'click .js-field-has-members'(evt) {

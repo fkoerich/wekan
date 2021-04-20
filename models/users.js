@@ -311,6 +311,40 @@ Users.attachSchema(
       optional: false,
       defaultValue: 'password',
     },
+    sessionData: {
+      /**
+       * profile settings
+       */
+      type: Object,
+      optional: true,
+      // eslint-disable-next-line consistent-return
+      autoValue() {
+        if (this.isInsert && !this.isSet) {
+          return {};
+        }
+      },
+    },
+    'sessionData.totalHits': {
+      /**
+       * Total hits from last search
+       */
+      type: Number,
+      optional: true,
+    },
+    'sessionData.lastHit': {
+      /**
+       * last hit that was returned
+       */
+      type: Number,
+      optional: true,
+    },
+    importUsernames: {
+      /**
+       * username for imported
+       */
+      type: [String],
+      optional: true,
+    },
   }),
 );
 
@@ -349,6 +383,14 @@ Users.initEasySearch(searchInFields, {
   use: 'mongo-db',
   returnFields: [...searchInFields, 'profile.avatarUrl'],
 });
+
+Users.safeFields = {
+  _id: 1,
+  username: 1,
+  'profile.fullname': 1,
+  'profile.avatarUrl': 1,
+  'profile.initials': 1,
+};
 
 if (Meteor.isClient) {
   Users.helpers({
@@ -398,7 +440,18 @@ if (Meteor.isClient) {
   });
 }
 
+Users.parseImportUsernames = usernamesString => {
+  return usernamesString.trim().split(new RegExp('\\s*[,;]\\s*'));
+};
+
 Users.helpers({
+  importUsernamesString() {
+    if (this.importUsernames) {
+      return this.importUsernames.join(', ');
+    }
+    return '';
+  },
+
   boards() {
     return Boards.find(
       { 'members.userId': this._id },
@@ -616,6 +669,15 @@ Users.mutations({
       },
     };
   },
+
+  setName(value) {
+    return {
+      $set: {
+        'profile.fullname': value,
+      },
+    };
+  },
+
   toggleDesktopHandles(value = false) {
     return {
       $set: {
@@ -735,14 +797,44 @@ Meteor.methods({
 
 if (Meteor.isServer) {
   Meteor.methods({
-    setCreateUser(fullname, username, password, isAdmin, isActive, email) {
+    setAllUsersHideSystemMessages() {
+      if (Meteor.user() && Meteor.user().isAdmin) {
+        // If setting is missing, add it
+        Users.update(
+          { 'profile.hiddenSystemMessages': { $exists: false } },
+          { $set: { 'profile.hiddenSystemMessages': true } },
+          { multi: true },
+        );
+        // If setting is false, set it to true
+        Users.update(
+          { 'profile.hiddenSystemMessages': false },
+          { $set: { 'profile.hiddenSystemMessages': true } },
+          { multi: true },
+        );
+        return true;
+      } else {
+        return false;
+      }
+    },
+    setCreateUser(
+      fullname,
+      username,
+      initials,
+      password,
+      isAdmin,
+      isActive,
+      email,
+      importUsernames,
+    ) {
       if (Meteor.user() && Meteor.user().isAdmin) {
         check(fullname, String);
         check(username, String);
+        check(initials, String);
         check(password, String);
         check(isAdmin, String);
         check(isActive, String);
         check(email, String);
+        check(importUsernames, Array);
 
         const nUsersWithUsername = Users.find({ username }).count();
         const nUsersWithEmail = Users.find({ email }).count();
@@ -752,7 +844,6 @@ if (Meteor.isServer) {
           throw new Meteor.Error('email-already-taken');
         } else {
           Accounts.createUser({
-            fullname,
             username,
             password,
             isAdmin,
@@ -760,6 +851,16 @@ if (Meteor.isServer) {
             email: email.toLowerCase(),
             from: 'admin',
           });
+          const user = Users.findOne(username) || Users.findOne({ username });
+          if (user) {
+            Users.update(user._id, {
+              $set: {
+                'profile.fullname': fullname,
+                importUsernames,
+                'profile.initials': initials,
+              },
+            });
+          }
         }
       }
     },
@@ -820,6 +921,34 @@ if (Meteor.isServer) {
         if (Meteor.user().isAdmin) {
           Accounts.setPassword(userId, newPassword);
         }
+      }
+    },
+    setEmailVerified(email, verified, userId) {
+      if (Meteor.user() && Meteor.user().isAdmin) {
+        check(email, String);
+        check(verified, Boolean);
+        check(userId, String);
+        Users.update(userId, {
+          $set: {
+            emails: [
+              {
+                address: email,
+                verified,
+              },
+            ],
+          },
+        });
+      }
+    },
+    setInitials(initials, userId) {
+      if (Meteor.user() && Meteor.user().isAdmin) {
+        check(initials, String);
+        check(userId, String);
+        Users.update(userId, {
+          $set: {
+            'profile.initials': initials,
+          },
+        });
       }
     },
     // we accept userId, username, email
@@ -905,6 +1034,16 @@ if (Meteor.isServer) {
       }
       return { username: user.username, email: user.emails[0].address };
     },
+    impersonate(userId) {
+      check(userId, String);
+
+      if (!Meteor.users.findOne(userId))
+        throw new Meteor.Error(404, 'User not found');
+      if (!Meteor.user().isAdmin)
+        throw new Meteor.Error(403, 'Permission denied');
+
+      this.setUserId(userId);
+    },
   });
   Accounts.onCreateUser((options, user) => {
     const userCount = Users.find().count();
@@ -922,8 +1061,10 @@ if (Meteor.isServer) {
       user.username = user.services.oidc.username;
       user.emails = [{ address: email, verified: true }];
       const initials = user.services.oidc.fullname
-        .match(/\b[a-zA-Z]/g)
-        .join('')
+        .split(/\s+/)
+        .reduce((memo, word) => {
+          return memo + word[0];
+        }, '')
         .toUpperCase();
       user.profile = {
         initials,
@@ -1344,13 +1485,18 @@ if (Meteor.isServer) {
    *
    * @description Only the admin user (the first user) can call the REST API.
    *
-   * @param {string} userId the user ID
+   * @param {string} userId the user ID or username
    * @return_type Users
    */
   JsonRoutes.add('GET', '/api/users/:userId', function(req, res) {
     try {
       Authentication.checkUserId(req.userId);
-      const id = req.params.userId;
+      let id = req.params.userId;
+      let user = Meteor.users.findOne({ _id: id });
+      if (!user) {
+        user = Meteor.users.findOne({ username: id });
+        id = user._id;
+      }
 
       // get all boards where the user is member of
       let boards = Boards.find(
@@ -1369,7 +1515,6 @@ if (Meteor.isServer) {
         return u;
       });
 
-      const user = Meteor.users.findOne({ _id: id });
       user.boards = boards;
       JsonRoutes.sendResult(res, {
         code: 200,
@@ -1621,11 +1766,52 @@ if (Meteor.isServer) {
     try {
       Authentication.checkUserId(req.userId);
       const id = req.params.userId;
-      Meteor.users.remove({ _id: id });
+      // Delete is not enabled yet, because it does leave empty user avatars
+      // to boards: boards members, card members and assignees have
+      // empty users. See:
+      // - wekan/client/components/settings/peopleBody.jade deleteButton
+      // - wekan/client/components/settings/peopleBody.js deleteButton
+      // - wekan/client/components/sidebar/sidebar.js Popup.afterConfirm('removeMember'
+      //   that does now remove member from board, card members and assignees correctly,
+      //   but that should be used to remove user from all boards similarly
+      // - wekan/models/users.js Delete is not enabled
+      // Meteor.users.remove({ _id: id });
       JsonRoutes.sendResult(res, {
         code: 200,
         data: {
           _id: id,
+        },
+      });
+    } catch (error) {
+      JsonRoutes.sendResult(res, {
+        code: 200,
+        data: error,
+      });
+    }
+  });
+
+  /**
+   * @operation create_user_token
+   *
+   * @summary Create a user token
+   *
+   * @description Only the admin user (the first user) can call the REST API.
+   *
+   * @param {string} userId the ID of the user to create token for.
+   * @return_type {_id: string}
+   */
+  JsonRoutes.add('POST', '/api/createtoken/:userId', function(req, res) {
+    try {
+      Authentication.checkUserId(req.userId);
+      const id = req.params.userId;
+      const token = Accounts._generateStampedLoginToken();
+      Accounts._insertLoginToken(id, token);
+
+      JsonRoutes.sendResult(res, {
+        code: 200,
+        data: {
+          _id: id,
+          authToken: token.token,
         },
       });
     } catch (error) {

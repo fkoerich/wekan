@@ -11,9 +11,12 @@ SET ROOT_URL=http://localhost
 SET PORT=80
 SET MONGO_URL=mongodb://127.0.0.1:27017/wekan
 
-REM https://github.com/wekan/wekan/wiki/Troubleshooting-Mail
+REM # https://github.com/wekan/wekan/wiki/Troubleshooting-Mail
 REM SET MAIL_URL=smtps://username:password@email-smtp.eu-west-1.amazonaws.com:587/
 REM SET MAIL_FROM="Wekan Boards <info@example.com>"
+
+REM # ==== NUMBER OF SEARCH RESULTS PER PAGE BY DEFAULT ====
+REM SET RESULTS_PER_PAGE=20
 
 REM # If you disable Wekan API with false, Export Board does not work.
 SET WITH_API=true
@@ -21,11 +24,6 @@ SET WITH_API=true
 REM # ==== RICH TEXT EDITOR IN CARD COMMENTS ====
 REM # https://github.com/wekan/wekan/pull/2560
 SET RICHER_CARD_COMMENT_EDITOR=false
-
-REM # ==== MOUSE SCROLL ====
-REM # https://github.com/wekan/wekan/issues/2949
-SET SCROLLINERTIA=0
-SET SCROLLAMOUNT=auto
 
 REM # ==== CARD OPENED, SEND WEBHOOK MESSAGE ====
 SET CARD_OPENED_WEBHOOK_ENABLED=false
@@ -119,10 +117,21 @@ REM SET WEBHOOKS_ATTRIBUTES=
 
 REM ------------------------------------------------------------
 
+REM # OAUTH2 ORACLE on premise identity manager OIM
+REM SET ORACLE_OIM_ENABLED=true
+
+REM ------------------------------------------------------------
+
 REM # Enable the OAuth2 connection
 REM # OAuth2 docs: https://github.com/wekan/wekan/wiki/OAuth2
 REM # example: OAUTH2_ENABLED=true
 REM SET OAUTH2_ENABLED=false
+
+REM # Optional OAuth2 CA Cert, see https://github.com/wekan/wekan/issues/3299
+REM SET OAUTH2_CA_CERT=ABCD1234
+
+REM # Use OAuth2 ADFS additional changes. Also needs OAUTH2_ENABLED=true setting.
+REM SET OAUTH2_ADFS_ENABLED=false
 
 REM # OAuth2 Client ID, for example from Rocket.Chat. Example: abcde12345
 REM # example: OAUTH2_CLIENT_ID=abcde12345
@@ -391,5 +400,22 @@ REM SET LOGOUT_ON_HOURS=
 REM # LOGOUT_ON_MINUTES : The number of minutes
 REM # example : LOGOUT_ON_MINUTES=55
 REM SET LOGOUT_ON_MINUTES=
+
+REM SET CAS_ENABLED=true
+REM SET CAS_BASE_URL=https://cas.example.com/cas
+REM SET CAS_LOGIN_URL=https://cas.example.com/login
+REM SET CAS_VALIDATE_URL=https://cas.example.com/cas/p3/serviceValidate
+
+REM SET SAML_ENABLED=true
+REM SET SAML_PROVIDER=
+REM SET SAML_ENTRYPOINT=
+REM SET SAML_ISSUER=
+REM SET SAML_CERT=
+REM SET SAML_IDPSLO_REDIRECTURL=
+REM SET SAML_PRIVATE_KEYFILE=
+REM SET SAML_PUBLIC_CERTFILE=
+REM SET SAML_IDENTIFIER_FORMAT=
+REM SET SAML_LOCAL_PROFILE_MATCH_ATTRIBUTE=
+REM SET SAML_ATTRIBUTES=
 
 node main.js

@@ -1,5 +1,3 @@
-import { Cookies } from 'meteor/ostrio:cookies';
-const cookies = new Cookies();
 let listsColors;
 Meteor.startup(() => {
   listsColors = Lists.simpleSchema()._schema.color.allowedValues;
@@ -74,9 +72,17 @@ BlazeComponent.extendComponent({
     );
   },
 
+  exceededWipLimit() {
+    const list = Template.currentData();
+    return (
+      list.getWipLimit('enabled') &&
+      list.getWipLimit('value') < list.cards().count()
+    );
+  },
+
   showCardsCountForList(count) {
     const limit = this.limitToShowCardsCount();
-    return limit > 0 && count > limit;
+    return limit >= 0 && count >= limit;
   },
 
   events() {
@@ -106,11 +112,15 @@ BlazeComponent.extendComponent({
 }).register('listHeader');
 
 Template.listHeader.helpers({
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
+
   showDesktopDragHandles() {
     currentUser = Meteor.user();
     if (currentUser) {
       return (currentUser.profile || {}).showDesktopDragHandles;
-    } else if (cookies.has('showDesktopDragHandles')) {
+    } else if (window.localStorage.getItem('showDesktopDragHandles')) {
       return true;
     } else {
       return false;
@@ -119,6 +129,10 @@ Template.listHeader.helpers({
 });
 
 Template.listActionPopup.helpers({
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
+
   isWipLimitEnabled() {
     return Template.currentData().getWipLimit('enabled');
   },
@@ -256,6 +270,12 @@ Template.listMorePopup.events({
   }),
 });
 
+Template.listHeader.helpers({
+  isBoardAdmin() {
+    return Meteor.user().isBoardAdmin();
+  },
+});
+
 BlazeComponent.extendComponent({
   onCreated() {
     this.currentList = this.currentData();
@@ -267,7 +287,11 @@ BlazeComponent.extendComponent({
   },
 
   isSelected(color) {
-    return this.currentColor.get() === color;
+    if (this.currentColor.get() === null) {
+      return color === 'white';
+    } else {
+      return this.currentColor.get() === color;
+    }
   },
 
   events() {

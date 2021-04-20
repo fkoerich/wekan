@@ -4,8 +4,7 @@ template(name="cardCustomFieldsPopup")
             li.item(class="")
                 a.name.js-select-field(href="#")
                     span.full-name
-                      +viewer
-                        = name
+                      = name
                     if hasCustomField
                       i.fa.fa-check
     hr
@@ -52,6 +51,14 @@ template(name="cardCustomField-number")
     else
         if value
             = value
+
+template(name="cardCustomField-checkbox")
+  .js-checklist-item.checklist-item(class="{{#if data.value }}is-checked{{/if}}")
+    if canModifyCard
+      .check-box-container
+        .check-box.materialCheckBox(class="{{#if data.value }}is-checked{{/if}}")
+    else
+      .materialCheckBox(class="{{#if data.value }}is-checked{{/if}}")
 
 template(name="cardCustomField-currency")
     if canModifyCard
@@ -112,3 +119,24 @@ template(name="cardCustomField-dropdown")
         if value
             +viewer
                 = selectedItem
+
+template(name="cardCustomField-stringtemplate")
+    if canModifyCard
+        +inlinedForm(classNames="js-card-customfield-stringtemplate")
+            each item in stringtemplateItems.get
+                input.js-card-customfield-stringtemplate-item(type="text" value=item placeholder="")
+            input.js-card-customfield-stringtemplate-item.last(type="text" value="" placeholder="{{_ 'custom-field-stringtemplate-item-placeholder'}}")
+            .edit-controls.clearfix
+                button.primary(type="submit") {{_ 'save'}}
+                a.fa.fa-times-thin.js-close-inlined-form
+        else
+            a.js-open-inlined-form
+                if value
+                    +viewer
+                        = formattedValue
+                else
+                    | {{_ 'edit'}}
+    else
+        if value
+            +viewer
+                = formattedValue

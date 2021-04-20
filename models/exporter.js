@@ -1,9 +1,10 @@
-//const stringify = require('csv-stringify');
+const Papa = require('papaparse');
 
 // exporter maybe is broken since Gridfs introduced, add fs and path
 export class Exporter {
-  constructor(boardId) {
+  constructor(boardId, attachmentId) {
     this._boardId = boardId;
+    this._attachmentId = attachmentId;
   }
 
   build() {
@@ -33,6 +34,62 @@ export class Exporter {
         },
       }),
     );
+
+    // [Old] for attachments we only export IDs and absolute url to original doc
+    // [New] Encode attachment to base64
+
+    const getBase64Data = function(doc, callback) {
+      let buffer = Buffer.allocUnsafe(0);
+      buffer.fill(0);
+
+      // callback has the form function (err, res) {}
+      const tmpFile = path.join(
+        os.tmpdir(),
+        `tmpexport${process.pid}${Math.random()}`,
+      );
+      const tmpWriteable = fs.createWriteStream(tmpFile);
+      const readStream = doc.createReadStream();
+      readStream.on('data', function(chunk) {
+        buffer = Buffer.concat([buffer, chunk]);
+      });
+
+      readStream.on('error', function() {
+        callback(null, null);
+      });
+      readStream.on('end', function() {
+        // done
+        fs.unlink(tmpFile, () => {
+          //ignored
+        });
+
+        callback(null, buffer.toString('base64'));
+      });
+      readStream.pipe(tmpWriteable);
+    };
+    const getBase64DataSync = Meteor.wrapAsync(getBase64Data);
+    const byBoardAndAttachment = this._attachmentId
+      ? { boardId: this._boardId, _id: this._attachmentId }
+      : byBoard;
+    result.attachments = Attachments.find(byBoardAndAttachment)
+      .fetch()
+      .map(attachment => {
+        let filebase64 = null;
+        filebase64 = getBase64DataSync(attachment);
+
+        return {
+          _id: attachment._id,
+          cardId: attachment.cardId,
+          //url: FlowRouter.url(attachment.url()),
+          file: filebase64,
+          name: attachment.original.name,
+          type: attachment.original.type,
+        };
+      });
+    //When has a especific valid attachment return the single element
+    if (this._attachmentId) {
+      return result.attachments.length > 0 ? result.attachments[0] : {};
+    }
+
     result.lists = Lists.find(byBoard, noBoardId).fetch();
     result.cards = Cards.find(byBoardNoLinked, noBoardId).fetch();
     result.swimlanes = Swimlanes.find(byBoard, noBoardId).fetch();
@@ -83,54 +140,6 @@ export class Exporter {
         ).fetch(),
       );
     });
-
-    // [Old] for attachments we only export IDs and absolute url to original doc
-    // [New] Encode attachment to base64
-
-    const getBase64Data = function(doc, callback) {
-      let buffer = Buffer.allocUnsafe(0);
-      buffer.fill(0);
-
-      // callback has the form function (err, res) {}
-      const tmpFile = path.join(
-        os.tmpdir(),
-        `tmpexport${process.pid}${Math.random()}`,
-      );
-      const tmpWriteable = fs.createWriteStream(tmpFile);
-      const readStream = doc.createReadStream();
-      readStream.on('data', function(chunk) {
-        buffer = Buffer.concat([buffer, chunk]);
-      });
-
-      readStream.on('error', function() {
-        callback(null, null);
-      });
-      readStream.on('end', function() {
-        // done
-        fs.unlink(tmpFile, () => {
-          //ignored
-        });
-
-        callback(null, buffer.toString('base64'));
-      });
-      readStream.pipe(tmpWriteable);
-    };
-    const getBase64DataSync = Meteor.wrapAsync(getBase64Data);
-    result.attachments = Attachments.find(byBoard)
-      .fetch()
-      .map(attachment => {
-        let filebase64 = null;
-        filebase64 = getBase64DataSync(attachment);
-
-        return {
-          _id: attachment._id,
-          cardId: attachment.cardId,
-          //url: FlowRouter.url(attachment.url()),
-          file: filebase64,
-          name: attachment.original.name,
-          type: attachment.original.type,
-        };
-      });
 
     // we also have to export some user data - as the other elements only
     // include id but we have to be careful:
@@ -192,6 +201,40 @@ export class Exporter {
     const result = this.build();
     const columnHeaders = [];
     const cardRows = [];
+
+    const papaconfig = {
+      delimiter, // get parameter (was: auto-detect)
+      worker: true,
+    };
+
+    /*
+      newline: "",	// auto-detect
+      quoteChar: '"',
+      escapeChar: '"',
+      header: true,
+      transformHeader: undefined,
+      dynamicTyping: false,
+      preview: 0,
+      encoding: "",
+      comments: false,
+      step: undefined,
+      complete: undefined,
+      error: undefined,
+      download: false,
+      downloadRequestHeaders: undefined,
+      downloadRequestBody: undefined,
+      skipEmptyLines: false,
+      chunk: undefined,
+      chunkSize: undefined,
+      fastMode: undefined,
+      beforeFirstChunk: undefined,
+      withCredentials: undefined,
+      transform: undefined
+    };
+    */
+
+    //delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP]
+
     columnHeaders.push(
       'Title',
       'Description',
@@ -240,6 +283,7 @@ export class Exporter {
       }
       i++;
     });
+    cardRows.push([[columnHeaders]]);
     /* TODO: Try to get translations working.
              These currently only bring English translations.
     TAPi18n.__('title'),
@@ -263,24 +307,6 @@ export class Exporter {
     TAPi18n.__('voting'),
     TAPi18n.__('archived'),
     */
-
-    const stringifier = stringify({
-      header: true,
-      delimiter,
-      columns: columnHeaders,
-    });
-
-    stringifier.on('readable', function() {
-      let row;
-      while ((row = stringifier.read())) {
-        cardRows.push(row);
-      }
-    });
-
-    stringifier.on('error', function(err) {
-      // eslint-disable-next-line no-console
-      console.error(err.message);
-    });
 
     result.cards.forEach(card => {
       const currentRow = [];
@@ -385,10 +411,10 @@ export class Exporter {
           currentRow.push(customFieldValuesToPush[valueIndex]);
         }
       }
-      stringifier.write(currentRow);
+      cardRows.push([[currentRow]]);
     });
-    stringifier.end();
-    return cardRows[0];
+
+    return Papa.unparse(cardRows, papaconfig);
   }
 
   canExport(user) {

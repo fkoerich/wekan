@@ -1,5 +1,3 @@
-import { Cookies } from 'meteor/ostrio:cookies';
-const cookies = new Cookies();
 const { calculateIndex } = Utils;
 
 function currentListIsInThisSwimlane(swimlaneId) {
@@ -87,14 +85,14 @@ function initSortable(boardComponent, $listsDom) {
     },
   });
 
-  function userIsMember() {
-    return (
-      Meteor.user() &&
-      Meteor.user().isBoardMember() &&
-      !Meteor.user().isCommentOnly() &&
-      !Meteor.user().isWorker()
-    );
-  }
+  //function userIsMember() {
+  //  return (
+  //    Meteor.user() &&
+  //    Meteor.user().isBoardMember() &&
+  //    !Meteor.user().isCommentOnly() &&
+  //    !Meteor.user().isWorker()
+  //  );
+  //}
 
   boardComponent.autorun(() => {
     let showDesktopDragHandles = false;
@@ -102,7 +100,7 @@ function initSortable(boardComponent, $listsDom) {
     if (currentUser) {
       showDesktopDragHandles = (currentUser.profile || {})
         .showDesktopDragHandles;
-    } else if (cookies.has('showDesktopDragHandles')) {
+    } else if (window.localStorage.getItem('showDesktopDragHandles')) {
       showDesktopDragHandles = true;
     } else {
       showDesktopDragHandles = false;
@@ -124,7 +122,8 @@ function initSortable(boardComponent, $listsDom) {
         'option',
         'disabled',
         // Disable drag-dropping when user is not member/is worker
-        !userIsMember() || Meteor.user().isWorker(),
+        //!userIsMember() || Meteor.user().isWorker(),
+        !Meteor.user().isBoardAdmin(),
         // Not disable drag-dropping while in multi-selection mode
         // MultiSelection.isActive() || !userIsMember(),
       );
@@ -178,7 +177,7 @@ BlazeComponent.extendComponent({
           if (currentUser) {
             showDesktopDragHandles = (currentUser.profile || {})
               .showDesktopDragHandles;
-          } else if (cookies.has('showDesktopDragHandles')) {
+          } else if (window.localStorage.getItem('showDesktopDragHandles')) {
             showDesktopDragHandles = true;
           } else {
             showDesktopDragHandles = false;
@@ -269,19 +268,20 @@ Template.swimlane.helpers({
     currentUser = Meteor.user();
     if (currentUser) {
       return (currentUser.profile || {}).showDesktopDragHandles;
-    } else if (cookies.has('showDesktopDragHandles')) {
+    } else if (window.localStorage.getItem('showDesktopDragHandles')) {
       return true;
     } else {
       return false;
     }
   },
   canSeeAddList() {
-    return (
+    return Meteor.user().isBoardAdmin();
+    /*
       Meteor.user() &&
       Meteor.user().isBoardMember() &&
       !Meteor.user().isCommentOnly() &&
       !Meteor.user().isWorker()
-    );
+      */
   },
 });
 
@@ -323,3 +323,46 @@ BlazeComponent.extendComponent({
     initSortable(boardComponent, $listsDom);
   },
 }).register('listsGroup');
+
+BlazeComponent.extendComponent({
+  onCreated() {
+    this.currentSwimlane = this.currentData();
+  },
+
+  board() {
+    return Boards.findOne(Session.get('currentBoard'));
+  },
+
+  toBoards() {
+    const boards = Boards.find(
+      {
+        archived: false,
+        'members.userId': Meteor.userId(),
+        type: 'board',
+        _id: { $ne: this.board()._id },
+      },
+      {
+        sort: { title: 1 },
+      },
+    );
+
+    return boards;
+  },
+
+  events() {
+    return [
+      {
+        'click .js-done'() {
+          const swimlane = Swimlanes.findOne(this.currentSwimlane._id);
+          const bSelect = $('.js-select-boards')[0];
+          let boardId;
+          if (bSelect) {
+            boardId = bSelect.options[bSelect.selectedIndex].value;
+            Meteor.call('moveSwimlane', this.currentSwimlane._id, boardId);
+          }
+          Popup.close();
+        },
+      },
+    ];
+  },
+}).register('moveSwimlanePopup');

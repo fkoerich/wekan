@@ -49,7 +49,7 @@ Template.editor.onRendered(() => {
           ['para', ['ul', 'ol', 'paragraph']],
           ['table', ['table']],
           //['insert', ['link', 'picture', 'video']], // iframe tag will be sanitized TODO if iframe[class=note-video-clip] can be added into safe list, insert video can be enabled
-          //['insert', ['link', 'picture']], // modal popup has issue somehow :(
+          ['insert', ['link']], //, 'picture']], // modal popup has issue somehow :(
           ['view', ['fullscreen', 'help']],
         ];
     const cleanPastedHTML = function(input) {
@@ -91,6 +91,7 @@ Template.editor.onRendered(() => {
     };
     const editor = '.editor';
     const selectors = [
+      `.js-new-description-form ${editor}`,
       `.js-new-comment-form ${editor}`,
       `.js-edit-comment ${editor}`,
     ].join(','); // only new comment and edit comment
@@ -233,6 +234,8 @@ Template.editor.onRendered(() => {
             },
           },
           dialogsInBody: true,
+          spellCheck: true,
+          disableGrammar: false,
           disableDragAndDrop: true,
           toolbar,
           popover: {
@@ -244,6 +247,7 @@ Template.editor.onRendered(() => {
               ['float', ['floatLeft', 'floatRight', 'floatNone']],
               ['remove', ['removeMedia']],
             ],
+            link: [['link', ['linkDialogShow', 'unlink']]],
             table: [
               ['add', ['addRowDown', 'addRowUp', 'addColLeft', 'addColRight']],
               ['delete', ['deleteRow', 'deleteCol', 'deleteTable']],
@@ -264,6 +268,34 @@ Template.editor.onRendered(() => {
 
 import sanitizeXss from 'xss';
 
+// Additional  safeAttrValue function to allow for other specific protocols
+// See https://github.com/leizongmin/js-xss/issues/52#issuecomment-241354114
+function mySafeAttrValue(tag, name, value, cssFilter) {
+  // only when the tag is 'a' and attribute is 'href'
+  // then use your custom function
+  if (tag === 'a' && name === 'href') {
+    // only filter the value if starts with 'cbthunderlink:' or 'aodroplink'
+    if (
+      /^thunderlink:/gi.test(value) ||
+      /^cbthunderlink:/gi.test(value) ||
+      /^aodroplink:/gi.test(value) ||
+      /^onenote:/gi.test(value) ||
+      /^file:/gi.test(value) ||
+      /^abasurl:/gi.test(value) ||
+      /^conisio:/gi.test(value) ||
+      /^mailspring:/gi.test(value)
+    ) {
+      return value;
+    } else {
+      // use the default safeAttrValue function to process all non cbthunderlinks
+      return sanitizeXss.safeAttrValue(tag, name, value, cssFilter);
+    }
+  } else {
+    // use the default safeAttrValue function to process it
+    return sanitizeXss.safeAttrValue(tag, name, value, cssFilter);
+  }
+}
+
 // XXX I believe we should compute a HTML rendered field on the server that
 // would handle markdown and user mentions. We can simply have two
 // fields, one source, and one compiled version (in HTML) and send only the
@@ -277,7 +309,8 @@ Blaze.Template.registerHelper(
     const view = this;
     let content = Blaze.toHTML(view.templateContentBlock);
     const currentBoard = Boards.findOne(Session.get('currentBoard'));
-    if (!currentBoard) return HTML.Raw(sanitizeXss(content));
+    if (!currentBoard)
+      return HTML.Raw(sanitizeXss(content, { safeAttrValue: mySafeAttrValue }));
     const knowedUsers = currentBoard.members.map(member => {
       const u = Users.findOne(member.userId);
       if (u) {
@@ -321,7 +354,7 @@ Blaze.Template.registerHelper(
       content = content.replace(fullMention, Blaze.toHTML(link));
     }
 
-    return HTML.Raw(sanitizeXss(content));
+    return HTML.Raw(sanitizeXss(content, { safeAttrValue: mySafeAttrValue }));
   }),
 );
 
